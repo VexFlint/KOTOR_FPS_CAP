@@ -1,0 +1,15 @@
+# COFF Characteristics word, at e_lfanew (0x910) + 4 + 18 = file offset 0x926.
+#
+#   0x010F -> 0x012F   sets bit 0x0020 = IMAGE_FILE_LARGE_ADDRESS_AWARE
+#
+# Static hook: this is a file/header change that must take effect before the
+# image is loaded, so it cannot be applied by runtime injection.
+#
+# NOTE: the address here is a FILE OFFSET, not a virtual address, because
+# static hooks are applied to the executable on disk.
+
+[[hook]]
+address = "0x00000926"
+type = "static"
+original_bytes = "0F 01"
+replacement_bytes = "2F 01"

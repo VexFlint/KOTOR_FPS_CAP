@@ -1,0 +1,20 @@
+# _DAT_007a3c64 -- the frame cap, in FPS, read by the limiter block in WinMain
+# (0x4041F0) right after SwapBuffers:
+#
+#     if (0.0f < cap) {
+#         target = 1000.0f / cap;
+#         while (elapsed < target) { /* busy-spin on the game timer */ }
+#     }
+#
+# Ships as 0.0, so the limiter never runs. The only code that would set it
+# (CSWSModule::LoadModuleFinish, 0x4C5880) is gated on a BSS flag that nothing
+# writes, so the value is never touched during normal play -- a plain data
+# write holds for the whole session.
+#
+# 00 00 70 42 = 60.0f    (30.0f = 0000F041, 72.0f = 00009042, 120.0f = 0000F042)
+
+[[hook]]
+address = "0x007A3C64"
+type = "simple"
+original_bytes = "00 00 00 00"
+replacement_bytes = "00 00 70 42"

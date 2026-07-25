@@ -1,0 +1,34 @@
+# AddPartToMeshBuckets @ 0x46BDF0, called per mesh part while rendering.
+#
+#   0x46BE5F  e8 ..            call Material::GetTextureTID   -> eax = texID
+#   0x46BE64  8d 34 40         lea esi,[eax+eax*2]            ; esi = texID*3
+#   0x46BE67  8b 04 b5 e8 94 81 00   mov eax,[esi*4+0x8194E8]
+#   0x46BE6E  8b 0c b5 e4 94 81 00   mov ecx,[esi*4+0x8194E4]
+#
+# texID is never range-checked, and the arrays hold 5000 entries. The function
+# then writes a pointer through the computed address and may call
+# CExoArrayList::Allocate on it -- so an out-of-range ID corrupts memory rather
+# than merely reading garbage.
+#
+# We hook the two instructions at 0x46BE64 (10 bytes) and gate on the ID.
+# Skipping, not clamping: forcing an out-of-range part into a valid bucket
+# would attach it to an unrelated texture and mis-render. A part referencing a
+# texture slot that does not exist cannot render correctly in any case.
+#
+#   cmp eax, 5000        3D 88 13 00 00
+#   jb  +3               72 03            ; in range -> jump over the bail block
+#   pop esi              5E               ; bail: unwind exactly as the normal
+#   pop edi              5F               ;       exit path does at 0x46BEB1
+#   ret                  C3
+#   lea esi,[eax+eax*2]  8D 34 40         ; relocated original
+#   mov eax,[esi*4+..]   8B 04 B5 E8 94 81 00   ; relocated original
+#   <falls off the end -> automatic jump back to 0x46BE64+10 = 0x46BE6E>
+#
+# Stack at the hook point is [esi][edi][ret]: edi pushed at function entry
+# (0x46BDF0), esi at 0x46BE5E, and the intervening __thiscall is esp-neutral.
+
+[[hook]]
+address = "0x0046BE64"
+type = "replace"
+original_bytes = "8D 34 40 8B 04 B5 E8 94 81 00"
+replacement_bytes = "3D 88 13 00 00 72 03 5E 5F C3 8D 34 40 8B 04 B5 E8 94 81 00"

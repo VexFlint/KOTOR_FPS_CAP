@@ -1,0 +1,13 @@
+[patch]
+id = "texture-bucket-clear-clamp"
+name = "Texture Bucket Clear Clamp (crash fix)"
+version = "1.0.0"
+author = "VexFlint"
+description = "Fixes an access violation (0xC0000005 at 0x46BF22) on module load. ClearBuckets zeroes three 5000-entry arrays 'maxTexID + 1' times, where maxTexID is an unclamped running max of texture IDs read from mesh data (AurTextureBuildAndStoreAll, 0x4217F0 -- its sibling AurTextureGetOrdering does clamp to < 5000). An out-of-range texture reference runs the loop off the end of .data. This clamps the count returned by AurTextureGetMaxTexID to the array bound (4999). Recommended together with texture-bucket-write-guard, which fixes the same limit on the write side."
+
+requires = []
+
+conflicts = []
+
+[patch.supported_versions]
+kotor1_cdcrack_103 = "761F9466F456A83909036BAEBB5C43167D722387BE66E54617BA20A8C49E9886"

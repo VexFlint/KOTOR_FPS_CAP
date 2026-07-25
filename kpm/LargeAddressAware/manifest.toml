@@ -1,0 +1,13 @@
+[patch]
+id = "large-address-aware"
+name = "4GB Memory (LARGE_ADDRESS_AWARE)"
+version = "1.0.0"
+author = "VexFlint"
+description = "Sets the LARGE_ADDRESS_AWARE bit in the PE header so the 32-bit executable can use up to 4GB of address space instead of 2GB. Equivalent to the standard 4GB Patcher. Useful for heavy texture mod builds. Applied as a static hook because the PE header must be patched before the executable loads."
+
+requires = []
+
+conflicts = []
+
+[patch.supported_versions]
+kotor1_cdcrack_103 = "761F9466F456A83909036BAEBB5C43167D722387BE66E54617BA20A8C49E9886"

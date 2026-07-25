@@ -1,0 +1,18 @@
+# Never commit game binaries or assets — this repo ships tools and notes only.
+*.exe
+*.dll
+*.bak
+*.bik
+*.bif
+*.key
+*.mod
+*.rim
+*.erf
+*.tpc
+*.tga
+*.mdl
+*.mdx
+
+# local scratch
+__pycache__/
+*.pyc

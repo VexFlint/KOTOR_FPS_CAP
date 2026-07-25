@@ -1,0 +1,13 @@
+[patch]
+id = "frame-cap"
+name = "Frame Cap (60 FPS)"
+version = "1.0.0"
+author = "VexFlint"
+description = "Enables the frame limiter already present in KOTOR's main loop. The cap value at 0x7A3C64 defaults to 0.0, which disables it; this sets it to 60.0 so the engine limits itself. Addresses the framerate-tied movement / 'stuck after combat' freeze on high-refresh displays without external FPS caps. Note: the limiter is a busy-wait (BioWare's implementation), so it spins a core while pacing frames."
+
+requires = []
+
+conflicts = []
+
+[patch.supported_versions]
+kotor1_cdcrack_103 = "761F9466F456A83909036BAEBB5C43167D722387BE66E54617BA20A8C49E9886"

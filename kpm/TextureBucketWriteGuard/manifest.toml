@@ -1,0 +1,13 @@
+[patch]
+id = "texture-bucket-write-guard"
+name = "Texture Bucket Write Guard (crash fix)"
+version = "1.0.0"
+author = "VexFlint"
+description = "Bounds-checks AddPartToMeshBuckets (0x46BDF0), which indexes the 5000-entry texture bucket arrays by the raw ID from Material::GetTextureTID with no range check, then writes pointers and calls CExoArrayList::Allocate through the computed address. Out-of-range parts are skipped instead of corrupting adjacent memory. This is the write-side counterpart to texture-bucket-clear-clamp. NOTE: verified by inspection, not confirmed in play -- it only triggers when a model references a texture slot that does not exist, which cannot be produced on demand. Valid rendering is byte-for-byte unchanged."
+
+requires = []
+
+conflicts = []
+
+[patch.supported_versions]
+kotor1_cdcrack_103 = "761F9466F456A83909036BAEBB5C43167D722387BE66E54617BA20A8C49E9886"
