@@ -1,7 +1,8 @@
 # KOTOR 1 Engine Fixes
 
-Four small changes to `swkotor.exe`: a frame cap, the 4GB flag, and two bounds checks
-in the renderer's texture bookkeeping. No launcher or background process.
+Seven small changes to `swkotor.exe`: a frame cap, the 4GB flag, two crash fixes in the
+renderer's texture bookkeeping, and three fixes to the grass renderer. No launcher, no
+DLL, no background process — it edits your own executable and can undo itself.
 
 by VexFlint. Reverse engineering used [Lane's KotOR 1 (GoG) RE project](https://deadlystream.com/topic/11948-kotor-1-gog-reverse-engineering/) for symbols.
 
@@ -9,48 +10,58 @@ by VexFlint. Reverse engineering used [Lane's KotOR 1 (GoG) RE project](https://
 
 ## What it changes
 
-**1. Frame cap (movement freeze after combat)**
+**1. Frame cap**
 
-KOTOR ties movement and combat turns to frame timing, and on high-refresh displays the
-character's action queue can stall — you press forward and nothing happens until you
-switch party members or reload.
-
-The usual advice is to cap FPS externally or set the monitor to 60 Hz. The game already
-contains a frame limiter, but the value that enables it defaults to 0, so it never runs.
-This sets it, and the game limits itself. External caps are no longer needed.
+KOTOR ties simulation speed to frame timing — uncapped on a modern machine, the whole
+game runs fast. The engine already contains a frame limiter, but the value that switches
+it on defaults to 0, so it never runs. This sets it and the game paces itself. No driver
+cap or 60 Hz monitor mode needed.
 
 **2. 4GB memory support**
 
-Sets LARGE_ADDRESS_AWARE so the 32-bit game can use 4GB instead of 2GB. Same as the
-standard 4GB Patcher, included so it's one step.
+Sets LARGE_ADDRESS_AWARE so the 32-bit game can address 4GB instead of 2GB. Same as the
+standard 4GB Patcher, folded in so it's one step.
 
-**3. Crash when loading some areas**
+**3. Crash on area load**
 
-A texture bookkeeping loop can run past the end of its array (`0xC0000005`). More likely
-on heavily modded installs; Endar Spire reproduced it consistently during testing. The
-loop is now bounds-checked.
+A texture bookkeeping loop runs past the end of its array (`0xC0000005`). Bounds-checked.
 
-**4. Unchecked write to the same arrays**
+**4. Crash while rendering**
 
-The rendering side indexes those same arrays by texture ID without a bounds check.
-Out-of-range parts are now skipped. See Limitations — this one is not confirmed in play.
+The renderer indexes those same arrays by raw texture ID with no bounds check and writes
+through the result. Confirmed crashing at `0x46BEAE` on a heavily modded install.
+Out-of-range parts now skip the bucket insert.
+
+**5, 6, 7. Grass**
+
+The grass renderer has three separate bugs: a double free, a wrong pointer handed to
+OpenGL, and leaked GL state. Together they're why grass on Dantooine draws as beams and
+filaments across the sky, and why "just turn grass off" became standard advice.
+
+The pointer bug is the interesting one. `RenderGrassPolys` has three draw paths; two of
+them pass the address of an always-zero field to `glVertexPointer` instead of the
+allocated blade buffer. The third path — the one gated behind `GL_ATI_fragment_shader` —
+gets it right. That extension only ever existed on ATI hardware and was dropped from
+drivers years ago, so on NVIDIA, Intel, and any modern AMD card the game takes a broken
+path. Grass has rendered incorrectly for essentially everyone since around 2006.
 
 ---
 
 ## Before you start
 
-Steam's `swkotor.exe` is encrypted and can't be patched. Get **KOTOR Editable Executable**
-from DeadlyStream and put it in the game folder first. GOG's exe is usually already fine.
-The patcher checks and refuses files it doesn't recognise.
+Steam's `swkotor.exe` is encrypted and can't be patched. Get **KOTOR Editable
+Executable** from DeadlyStream and put it in the game folder first. GOG's exe is usually
+already fine. The patcher checks and refuses files it doesn't recognise.
 
-If you use UniWS widescreen or a mod build, do those first and this last. It touches one
-unused value and one unused padding region, so it stacks with other exe mods.
+If you use UniWS widescreen, the high-resolution menu patch, or a mod build, apply those
+first and this last. It only touches unused values and unused padding, so it stacks with
+other exe mods.
 
 ---
 
 ## Install
 
-You need Python 3 ([python.org](https://www.python.org/downloads/), tick "Add Python to
+You need Python 3 ([python.org](https://www.python.org/downloads/) — tick "Add Python to
 PATH" during install).
 
 1. Put `kotor_patch.py` anywhere
@@ -70,78 +81,85 @@ python kotor_patch.py "...\swkotor.exe" --verify   show current state
 python kotor_patch.py "...\swkotor.exe" --revert   undo
 ```
 
-`--revert` restores the file byte-for-byte.
+`--revert` restores the original bytes exactly.
 
-**This patches your own executable in place**, so any widescreen (UniWS), high-resolution
-menu patch, or other exe modification you already have is preserved. No pre-patched
-binary is distributed, because one wouldn't fit everyone's setup.
+**This patches your own executable in place**, so any widescreen or menu patch you
+already applied is preserved. No pre-patched binary is distributed, because one wouldn't
+fit everyone's setup.
 
-Launch the game from `swkotor.exe` directly rather than through Steam if you've applied
-widescreen — that requirement comes from UniWS, not from this patch.
-
----
-
-## Using KPM instead
-
-If you use the [KotOR Patch Manager](https://github.com/LaneDibello/Kotor-Patch-Manager),
-the same four fixes are packaged as KPM patches in [`kpm/`](kpm/). KPM injects at
-runtime instead of editing the executable, and lets you enable each fix
-individually. Use KPM *or* the script above, not both.
+Turn **Grass on** in the in-game graphics options — it's worth seeing now.
 
 ---
 
 ## Checking it
 
-`--verify` should show the FPS cap set, 4GB aware yes, and both texture fixes patched.
-In game, with no external cap enabled, framerate should sit at 60 on a high-refresh
-display.
+`--verify` should show the cap set, 4GB aware, and all five code fixes `patched`:
+
+```
+fps cap             : 60.0
+4GB aware           : yes
+bucket clear clamp  : patched
+bucket write guard  : patched
+grass double free   : patched
+grass vertex pointer: patched
+grass client state  : patched
+grass GL state      : patched
+```
+
+If any line says `unknown`, something else has modified that site and the patcher will
+refuse to touch it rather than guess.
 
 ---
 
 ## Questions
 
 **Do I still need a driver FPS cap or 60 Hz monitor mode?**
-No. You can leave the display at its normal refresh rate.
+No. Leave the display at its normal refresh rate.
+
+**Why cap at all if my PC can run it faster?**
+Because the game speeds up with the framerate. The cap is what keeps it running at the
+speed it was tuned for.
 
 **Cutscenes?**
 Unaffected — Bink plays them at their own encoded rate.
 
-**Can I use a different cap than 60?**
-Yes, pass any number. 60 matches what the engine's logic assumes; higher values reduce but
-may not eliminate the freeze.
-
 **Community Patch / mod builds / widescreen?**
-Fine. No game content is touched.
+Fine. No game content is touched, only the executable.
 
 **Steam "Verify integrity" undid it.**
-That restores the stock exe, which also removes any widescreen patch you had.
-Re-apply your exe mods, then run the patcher again.
+That restores the stock encrypted exe, which also removes any widescreen patch. Re-apply
+your exe mods, then run the patcher again.
+
+**Does this fix the movement freeze after combat?**
+Indirectly — the cap makes it much rarer. The direct fix is J's *Post-Combat Movement
+Fix* in the KotOR Patch Manager. Note that at the time of writing it also causes dialogue
+lines to be skipped, so test it before committing to a playthrough.
 
 ---
 
 ## Limitations
 
-- The frame limiter (fix 1) is a busy-wait — that's how BioWare implemented it; it spins
-  a core while pacing frames rather than sleeping.
-- Fix 3 prevents an out-of-bounds access; it doesn't repair whatever produced the bad
-  texture ID in the first place.
-- Fix 4 is verified by inspection but **not confirmed in play**. It only triggers when a
-  model references a texture slot that doesn't exist, which can't be produced on demand.
-  Valid rendering is unchanged; only out-of-range parts are skipped.
-- Tested on the standard PC v1.03 / editable-exe layout. Other builds may differ; the
-  patcher refuses files it doesn't recognise.
-- All four changes are reversible with `--revert`, which restores the file byte-for-byte.
+- The frame limiter is a busy-wait; that's how BioWare implemented it. It spins a core
+  pacing frames rather than sleeping.
+- Fixes 3 and 4 stop the crashes but don't repair the underlying cause: the engine
+  indexes fixed 5000-entry arrays with driver-assigned OpenGL texture names, which a
+  heavily modded install can exceed. Parts above the limit are skipped rather than drawn.
+- Tested on the standard PC v1.03 / editable-exe layout with a 180-mod build on AMD
+  hardware. Other configurations may differ; the patcher refuses files it doesn't
+  recognise.
+- Everything is reversible with `--revert`.
 
 ---
 
 ## Credits
 
 Lane's [KotOR 1 (GoG) reverse engineering](https://deadlystream.com/topic/11948-kotor-1-gog-reverse-engineering/)
-supplied the function symbols. Finding the texture bugs depended on having named
-subsystems to work from.
+supplied the function symbols. Finding these bugs depended on having named subsystems to
+work from — `RenderGrassPolys` and `DestroyGrassPolys` are only obvious once they have
+names.
 
-Technical notes — addresses, disassembly, and how each was found — are in `TECHNICAL.md`
-on the GitHub repo.
+Full analysis — addresses, disassembly, and how each bug was found and confirmed — is in
+[`TECHNICAL.md`](TECHNICAL.md).
 
 *Reverse engineered from a legally owned copy for interoperability and bug fixing.
 Not affiliated with BioWare / LucasArts / Aspyr.*
